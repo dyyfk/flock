@@ -1,5 +1,5 @@
 This html mimics the flock behavior. Assignment from Comp Sci 559 Spring 2019.
-Credit to 
+Credit to Professor Michael Gleicher
 
 
 ## Todo
