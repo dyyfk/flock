@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<header>
+  <title>WB4: 7-Flock: Student Flocking Assignment</title>
+  <link rel="stylesheet" href="Libs/style559.css">
+</header>
+	
+<body>
+  <canvas id="flock" height="600px" width="600px" style="border:2px solid black"></canvas>
+	<div>
+  speed<input type="range" width="100px" min="0" max="5" step=".1" value="2" id="speed" />
+	
+  align<input type="range" width="100px" min="0" max="1" step=".1" value="0.3" id="align" />
+  cohesion<input type="range" width="100px" min="0" max="0.01" step=".001" value="0.003" id="cohesion" />
+  separation<input type="range" width="100px" min="0" max="1.5" step=".1" value="1" id="separation" />
+	</div>
+  <button id="add">Add 10</button><button id="clear">Clear</button>
+  <script> 
+	  /**
+ * 4-Matrix-Exercise.js - code for workbook 4 page 4
+ * provides a non-working example for students to edit
+ *
+ * written by Michael Gleicher, January 2019
+ *
+ */
+
+// see other files for explanation of these comments
+ // @ts-check
+/* jshint -W069, esversion:6 */
+
+/**
+ * If you want to read up on JavaScript classes, check out your favorite book or...
+ * the chapter in the Exploring JS book: http://exploringjs.com/es6/ch_classes.html
+ * 
+ */
+class Boid {
+    /**
+     * 
+     * @param {number} x    - initial X position
+     * @param {number} y    - initial Y position
+     * @param {number} vx   - initial X velocity
+     * @param {number} vy   - initial Y velocity
+     */
+    constructor(x,y,vx=1,vy=0) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+		this.collide = 0;
+		this.alignmentFactor = 0.5;
+		this.cohesionFactor = 0.0001;
+		this.separationFactor = 1;
+    }
+    /**
+     * Draw the Boid
+     * @param {CanvasRenderingContext2D} context 
+     */
+    draw(context) {
+        context.save();
+        context.translate(this.x, this.y);
+		context.strokeStyle = this.collide-- > 0  ? '#33658A' : '#F6AE2D'; 
+//        context.fillRect(-5,-5,10,10);
+		context.beginPath();
+			context.arc(0,0,10,Math.PI*2,0);
+			let angle = Math.atan2(this.vy,this.vx);
+			context.rotate(angle);
+			context.moveTo(-4,5);
+			context.lineTo(7,0);
+			context.lineTo(-4,-5);
+			context.lineTo(-4,5);
+		context.stroke();
+		context.closePath();
+        context.restore();
+    }
+	
+	findNeighbor(params){
+		return params.filter((param)=>param.d < 40);
+	}
+	align(neighbor){
+		let avgVx = 0;
+		let avgVy = 0; 
+		neighbor.forEach((param)=>{
+			avgVx += param.boid.vx;
+			avgVy += param.boid.vy;
+		});
+
+		if(neighbor.length>0){
+			avgVx = avgVx/neighbor.length
+			avgVy = avgVy/neighbor.length
+			avgVx = avgVx - this.vx;
+			avgVy = avgVy - this.vy;	
+		}
+		avgVx = avgVx * this.alignmentFactor;
+		avgVy = avgVy * this.alignmentFactor;
+
+		this.vx += avgVx;
+		this.vy += avgVy;
+	}
+	cohesion(neighbor){
+		let avgX = 0;
+		let avgY = 0; 
+		neighbor.forEach((param)=>{
+			avgX += param.boid.x 
+			avgY += param.boid.y 
+		})
+		if(neighbor.length>0){
+			avgX = avgX/neighbor.length
+			avgY = avgY/neighbor.length
+			avgX = avgX - this.x - this.vx;
+			avgY = avgY - this.y - this.vy;
+		}
+
+		avgX = avgX * this.cohesionFactor;
+		avgY = avgY * this.cohesionFactor;
+		this.vx += avgX;
+		this.vy += avgY;
+
+	}
+	
+	separation(neighbor){
+		neighbor.forEach((param)=>{
+			let avgVx = 0;
+			let avgVy = 0;
+			let dvx = param.boid.vx - this.vx;
+			let dvy = param.boid.vy - this.vy;
+			dvx = dvx*-this.separationFactor * 1/(param.d);
+			dvy = dvy*-this.separationFactor * 1/(param.d);
+			
+			
+			avgVx += dvx;
+			avgVy += dvy;
+			this.vx += avgVx;
+			this.vy += avgVy;
+		});
+
+
+
+	}
+    /**
+     * Perform the "steering" behavior -
+     * This function should update the velocity based on the other
+     * members of the flock.
+     * It is passed the entire flock (an array of Boids) - that includes
+     * "this"!
+     * Note: dealing with the boundaries does not need to be handled here
+     * (in fact it can't be, since there is no awareness of the canvas)
+     * *
+     * And remember, (vx,vy) should always be a unit vector!
+     * @param {Array<Boid>} flock 
+     */
+    steer(flock) {
+		let params = []
+		flock = flock.filter((boid)=>boid!==this);
+		flock.forEach((boid)=>{
+			let dx = boid.x - this.x;
+			let dy = boid.y - this.y;
+			let d = Math.sqrt(dx*dx+dy*dy);
+			params.push({boid:boid,dx:dx,dy:dy,d:d});
+		})
+		
+		let neighbor = this.findNeighbor(params);
+		
+		this.align(neighbor);
+		this.cohesion(neighbor);
+		this.separation(neighbor);
+		
+		/*
+		// Note - this sample behavior is just to help you understand
+		// what a steering function might  do
+		// all this one does is have things go in circles, rather than
+		// straight lines
+		// Something this simple would not count for the bonus points:
+		// a "real" steering behavior must consider other boids,
+		// or at least obstacles.
+		
+        // a simple steering behavior: 
+        // create a rotation matrix that turns by a small amount
+        // 2 degrees per time step
+        const angle = 2 * Math.PI / 180;
+        const s = Math.sin(angle);
+        const c = Math.cos(angle);
+
+        let ovx = this.vx;
+        let ovy = this.vy;
+
+        this.vx =  ovx * c + ovy * s;
+        this.vy = -ovx * s + ovy * c;
+		*/
+    }
+}
+
+window.onload = function() {
+    /** @type Array<Boid> */
+    let theBoids = [];
+
+    let canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("flock"));
+    let context = canvas.getContext("2d");
+
+    let speedSlider =/** @type {HTMLInputElement} */ (document.getElementById("speed"));
+    let alignSlider =/** @type {HTMLInputElement} */ (document.getElementById("align"));
+    let cohesionSlider =/** @type {HTMLInputElement} */ (document.getElementById("cohesion"));
+    let separationSlider =/** @type {HTMLInputElement} */ (document.getElementById("separation"));
+
+    function draw() {
+        context.clearRect(0,0,canvas.width,canvas.height);
+        theBoids.forEach(boid => boid.draw(context));
+    }
+
+    /**
+     * Create some initial boids
+     * STUDENT: may want to replace this
+     */
+    theBoids.push(new Boid(100,100));
+    theBoids.push(new Boid(200,200,-1,0));
+    theBoids.push(new Boid(300,300,0,-1));
+    theBoids.push(new Boid(400,400,0,1));
+
+    /**
+     * Handle the buttons
+     */
+    document.getElementById("add").onclick = function () {
+		for(var i = 0; i<10;i++){
+			let x;
+			let y;
+			let collide = true;
+			while(collide){
+				x = Math.random()*canvas.width;
+				y = Math.random()*canvas.height;				
+				collide = theBoids.some((boid)=>{
+					let dx = boid.x - x;
+					let dy = boid.y - y;
+					return dx*dx+dy*dy<20*20;
+				});
+			}
+			let vx = Math.random()*2-1;
+			let vy = Math.sqrt(1 - (vx*vx))* (Math.floor(Math.random()+0.5) % 2==0?1:-1);
+			theBoids.push(new Boid(x,y, vx, vy));
+		}
+    };
+    document.getElementById("clear").onclick = function() {
+		theBoids.length = 0;
+    };
+
+
+    /**
+     * The Actual Execution
+     */
+    function loop() {
+        // change directions
+        theBoids.forEach(boid => boid.steer(theBoids));
+        // move forward
+        let speed = Number(speedSlider.value);
+        let align = Number(alignSlider.value);
+        let cohesion = Number(cohesionSlider.value);
+        let separation = Number(separationSlider.value);
+		
+		let pos = [];
+        theBoids.forEach(function(boid,index) {
+            boid.x += boid.vx * speed;
+            boid.y += boid.vy * speed;
+			boid.alignmentFactor = align;
+			boid.cohesionFactor = cohesion;
+			boid.separationFactor = separation;
+			pos.push({x:boid.x,y:boid.y});
+        });
+        // make sure that we stay on the screen
+        theBoids.forEach(function(boid,index) {
+			pos.forEach(function(pos,i){
+				let dx = boid.x - pos.x;
+				let dy = boid.y - pos.y;
+				if(dx*dx+dy*dy<20*20&&dx*dx+dy*dy>400&&index!==i){
+					boid.vx = -boid.vx;
+					boid.vy = -boid.vy;
+					boid.collide = 20;
+				}
+			})
+
+			if(boid.x > canvas.width){ boid.vx = -boid.vx; boid.vy=boid.vy; boid.collide = 20;}
+			if(boid.y > canvas.height){ boid.vy = -boid.vy; boid.vx = boid.vx;boid.collide = 20;}
+            if (boid.x < 0){ boid.vx= -boid.vx;boid.vy = boid.vy; boid.collide = 20;}
+            if (boid.y < 0){ boid.vy = -boid.vy;boid.vx = boid.vx; boid.collide = 20;}
+			
+			let scale = Math.sqrt(1/(boid.vx*boid.vx + boid.vy * boid.vy));
+			boid.vx  = boid.vx * scale; 
+			boid.vy  = boid.vy * scale; 
+
+        });
+        // now we can draw
+        draw();
+        // and loop
+        window.requestAnimationFrame(loop);
+    
+    }
+    loop();
+};
+	</script>
+</body>
+</html>
